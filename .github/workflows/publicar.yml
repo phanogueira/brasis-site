@@ -1,3 +1,7 @@
+# Publica o site da BRASIS a cada alteração na branch main.
+# 1. Descompacta o código do site (fonte.zip).
+# 2. Junta o conteúdo publicado pelo GitHub (pasta conteudo/).
+# 3. Monta o site com o Eleventy e publica no GitHub Pages.
 name: Publicar site
 on:
   push:
@@ -18,11 +22,30 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - name: Descompactar o site
-        run: mkdir _site && unzip -q site.zip -d _site && ls -la _site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Preparar o código do site
+        run: mkdir fonte && unzip -q fonte.zip -d fonte
+      - name: Juntar o conteúdo da pasta conteudo/
+        run: |
+          shopt -s nullglob
+          for f in conteudo/analises/*.md; do cp "$f" fonte/src/analises/; done
+          for f in conteudo/projetos/*.md; do cp "$f" fonte/src/projetos/; done
+          mkdir -p fonte/src/assets/img/conteudo
+          for f in conteudo/imagens/*; do
+            case "$f" in *.md) ;; *) cp "$f" fonte/src/assets/img/conteudo/ ;; esac
+          done
+          echo "Análises:"; ls conteudo/analises || true
+      - name: Montar o site
+        working-directory: fonte
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          rm -rf _site/admin
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: fonte/_site
       - id: deploy
         uses: actions/deploy-pages@v4
